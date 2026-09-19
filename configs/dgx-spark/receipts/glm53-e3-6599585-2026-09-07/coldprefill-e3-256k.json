@@ -1,0 +1,87 @@
+{
+  "served_model": "GLM-5.3-Flash-EXL3",
+  "max_model_len": 700000,
+  "started_metrics": {
+    "num_requests_running": 0.0,
+    "prefix_cache_queries_total": 145792.0,
+    "prefix_cache_hits_total": 7168.0,
+    "prompt_tokens_total": 145792.0,
+    "local_compute": 138624.0,
+    "local_cache_hit": 7168.0
+  },
+  "ended_metrics": {
+    "num_requests_running": 0.0,
+    "prefix_cache_queries_total": 657805.0,
+    "prefix_cache_hits_total": 258048.0,
+    "prompt_tokens_total": 657805.0,
+    "local_compute": 399757.0,
+    "local_cache_hit": 258048.0
+  },
+  "results": [
+    {
+      "http": 200,
+      "error": null,
+      "finish_reason": "stop",
+      "prompt_tokens": 256002,
+      "completion_tokens": 2,
+      "cached_tokens": null,
+      "ttft_s": 209.39031770359725,
+      "wall_s": 209.3903506156057,
+      "prefill_tok_s": 1222.6066744995535,
+      "gen": "OK",
+      "reasoning": "",
+      "gen_ok": true,
+      "usage": {
+        "prompt_tokens": 256002,
+        "total_tokens": 256004,
+        "completion_tokens": 2
+      },
+      "name": "~256k",
+      "kind": "cold",
+      "target": 256000,
+      "filler_count": 255912,
+      "tokenize_est": 256001,
+      "salt": "COLD-PREFILL salt=a4466d8c-1959-4e9a-aaaa-44be61e9e8f9 pad=d5ac685ee52e347f2895b9634d36c6147eb4583a4c9f8e2c",
+      "metrics_delta": {
+        "prefix_cache_hits_total": 0.0,
+        "prefix_cache_queries_total": 256002.0,
+        "prompt_tokens_total": 256002.0,
+        "local_compute": 256002.0,
+        "local_cache_hit": 0.0
+      },
+      "gpu_cache_usage_perc": null
+    },
+    {
+      "http": 200,
+      "error": null,
+      "finish_reason": "stop",
+      "prompt_tokens": 256011,
+      "completion_tokens": 2,
+      "cached_tokens": null,
+      "ttft_s": 4.3447460401803255,
+      "wall_s": 4.344770553521812,
+      "prefill_tok_s": 58924.27258864006,
+      "gen": "OK",
+      "reasoning": "",
+      "gen_ok": true,
+      "usage": {
+        "prompt_tokens": 256011,
+        "total_tokens": 256013,
+        "completion_tokens": 2
+      },
+      "name": "~8k follow-up",
+      "kind": "apc",
+      "target": 256000,
+      "metrics_delta": {
+        "prefix_cache_hits_total": 250880.0,
+        "prefix_cache_queries_total": 256011.0,
+        "prompt_tokens_total": 256011.0,
+        "local_compute": 5131.0,
+        "local_cache_hit": 250880.0
+      },
+      "gpu_cache_usage_perc": null,
+      "assistant_echo": "OK"
+    }
+  ],
+  "wall_clock": "2026-09-07 16:26:00 +0100"
+}

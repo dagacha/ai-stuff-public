@@ -1,0 +1,20 @@
+diff --git a/harness/agent/providers.py b/harness/agent/providers.py
+index c28f8b9..ffa1cd2 100644
+--- a/harness/agent/providers.py
++++ b/harness/agent/providers.py
+@@ -186,6 +186,7 @@ class OpenAIProvider(LLMProvider):
+         if effort is not None:
+             return self._responses_complete(base, api_key, messages, tools, timeout, effort)
+ 
++        extra_env = os.environ.get("VULCANBENCH_OPENAI_EXTRA_PAYLOAD")
+         return _chat_completions_complete(
+             base,
+             api_key,
+@@ -194,6 +195,7 @@ class OpenAIProvider(LLMProvider):
+             tools,
+             timeout,
+             temperature=None if _openai_omits_chat_sampling(self.model) else 0,
++            extra_payload=json.loads(extra_env) if extra_env else None,
+         )
+ 
+     def _responses_complete(

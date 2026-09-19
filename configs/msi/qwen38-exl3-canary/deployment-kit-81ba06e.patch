@@ -1,0 +1,512 @@
+diff --git a/.gitignore b/.gitignore
+index 3fa09d2..7ef867f 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,0 +2 @@
++.env.*
+diff --git a/start.sh b/start.sh
+index b7e7d47..f185a20 100755
+--- a/start.sh
++++ b/start.sh
+@@ -18,3 +18,4 @@ fi
+-if [ ! -f .env ]; then
+-    cp .env.example .env
+-    echo "No .env found — created one from .env.example."
++ENV_FILE="${ENV_FILE:-.env}"
++if [ ! -f "$ENV_FILE" ]; then
++    cp .env.example "$ENV_FILE"
++    echo "No $ENV_FILE found — created one from .env.example."
+@@ -25 +26,2 @@ fi
+-source .env
++source "$ENV_FILE"
++VENV_DIR="${VENV_DIR:-.venv}"
+@@ -34,2 +36,2 @@ if [ -n "${HF_TOKEN:-}" ]; then export HF_TOKEN; fi
+-if [ ! -x .venv/bin/python ] \
+-   || ! .venv/bin/python -c "import torch, exllamav3, aiohttp, huggingface_hub" 2>/dev/null; then
++if [ ! -x "$VENV_DIR/bin/python" ] \
++   || ! "$VENV_DIR/bin/python" -c "import torch, exllamav3, aiohttp, huggingface_hub" 2>/dev/null; then
+@@ -84 +86 @@ if [ ! -x .venv/bin/python ] \
+-    _step "1/5 creating Python virtualenv" python3 -m venv .venv
++    _step "1/5 creating Python virtualenv" python3 -m venv "$VENV_DIR"
+@@ -86 +88 @@ if [ ! -x .venv/bin/python ] \
+-        .venv/bin/pip install --quiet --upgrade pip setuptools wheel typing_extensions packaging
++        "$VENV_DIR/bin/pip" install --quiet --upgrade pip setuptools wheel typing_extensions packaging
+@@ -91 +93 @@ if [ ! -x .venv/bin/python ] \
+-        .venv/bin/pip install torch \
++        "$VENV_DIR/bin/pip" install torch \
+@@ -124 +126 @@ if [ ! -x .venv/bin/python ] \
+-        .venv/bin/pip install --no-build-isolation \
++        "$VENV_DIR/bin/pip" install --no-build-isolation \
+@@ -127 +129 @@ if [ ! -x .venv/bin/python ] \
+-        .venv/bin/pip install --quiet aiohttp huggingface_hub
++        "$VENV_DIR/bin/pip" install --quiet aiohttp huggingface_hub
+@@ -131 +133 @@ fi
+-PYTHON=.venv/bin/python
++PYTHON="$VENV_DIR/bin/python"
+@@ -133 +135 @@ PYTHON=.venv/bin/python
+-export PATH="$(pwd)/.venv/bin:$PATH"
++export PATH="$VENV_DIR/bin:$PATH"
+@@ -210,0 +213,5 @@ esac
++if [ "${PREPARE_ONLY:-0}" = "1" ]; then
++    echo "PREPARE_ONLY=1: environment and requested weights are ready; not loading the GPU."
++    exit 0
++fi
++
+@@ -225,0 +233,4 @@ cmd=("$PYTHON" -u tools/serve_openai.py
++if [ -n "${SERVED_MODEL_NAME:-}" ]; then
++    cmd+=(--served_model_name "$SERVED_MODEL_NAME")
++fi
++
+diff --git a/tools/serve_openai.py b/tools/serve_openai.py
+index 23d22e4..6659e6a 100644
+--- a/tools/serve_openai.py
++++ b/tools/serve_openai.py
+@@ -11,0 +12 @@ Endpoints:
++  GET  /version
+@@ -12,0 +14 @@ Endpoints:
++  POST /v1/chat/completions/render
+@@ -32,0 +35,11 @@ Tool calling (Qwen3.8 XML format):
++Vision (opt-in, `--vision`): loads the checkpoint's vision tower (BF16, inside
++the EXL3 checkpoint) and accepts OpenAI `image_url` content parts (base64 data
++URIs; http(s) URLs only with `--allow_image_urls`, which refuses loopback,
++private, link-local and other non-public destinations after DNS resolution
++and on every redirect). Images are capped at `--max_image_mb` encoded bytes
++and `--max_image_mp` megapixels. Each image is embedded once, its alias placed in the
++message text (the engine delimits it with vision_start/end itself), and the
++embeddings ride along with the generation job. Image tokens count toward
++`prompt_tokens`. Requests with images against a server started without
++`--vision` get a 400.
++
+@@ -41,0 +55,2 @@ MODEL_DIR = "test_models/Qwen3.8-27B-exl3-3.5bpw-wm"
++MODEL_ID = "qwen3.8-27b-exl3-3.5bpw-wm"
++MODEL_IDS = []      # all names advertised by /v1/models (first = canonical)
+@@ -77 +92 @@ HOLD_BACK = 16                       # marker-safe holdback for streamed text
+-def build_model(argv, use_draft = True):
++def build_model(argv, use_draft = True, vision_model_dir = None):
+@@ -95,0 +111,9 @@ def build_model(argv, use_draft = True):
++    # Vision tower first: the text model's autosplit then sizes itself around
++    # it (validated order; loading it afterwards depends on leftover headroom).
++    vision_model = None
++    if vision_model_dir:
++        from exllamav3 import Config, Model
++        print(" -- Loading vision tower", flush = True)
++        vision_model = Model.from_config(Config.from_directory(vision_model_dir),
++                                         component = "vision")
++        vision_model.load(progressbar = True)
+@@ -112 +136,201 @@ def build_model(argv, use_draft = True):
+-    return generator, tokenizer
++    return generator, tokenizer, vision_model
++
++
++# Image embeddings are reused across turns of a conversation (agents resend
++# the whole history), keyed by the image URL/data URI. Each entry holds the
++# embedding on the CPU (~10 KB per image token), so keep the cache small.
++_IMAGE_CACHE_CAP = 8
++_image_cache = {}                  # insertion-ordered; hits move to the end (LRU)
++_image_cache_lock = threading.Lock()
++
++
++def _image_request_errors():
++    import binascii, urllib.error
++    from PIL import UnidentifiedImageError
++    return (ValueError, binascii.Error, UnidentifiedImageError,
++            urllib.error.URLError, OSError)
++
++
++_IMAGE_REQUEST_ERRORS = _image_request_errors()
++
++
++# Remote image_url fetching is off by default: a server-side fetch of a
++# client-supplied URL is an SSRF vector (loopback, Tailscale, LAN, cloud
++# metadata) and an unbounded download. `--allow_image_urls` enables it with
++# destination filtering and size caps; data: URIs are always accepted.
++_ALLOW_IMAGE_URLS = False
++_IMAGE_MAX_BYTES = 32 * 1024 * 1024
++_IMAGE_MAX_PIXELS = 64_000_000     # 28 MP test images pass; bombs do not
++_IMAGE_FETCH_TIMEOUT = 30
++_IMAGE_MAX_REDIRECTS = 3
++
++
++def _public_address(host):
++    """Resolve host, refuse anything that is not a public unicast address
++    (checked on every resolved address, so a name that maps to a private IP
++    alongside a public one is rejected too) and return the validated
++    (family, sockaddr) to connect to. The caller must connect to exactly
++    that address: resolving again at connect time would let a rebinding
++    DNS name pass validation publicly and then connect privately."""
++    import ipaddress, socket
++    try:
++        infos = socket.getaddrinfo(host, None, proto = socket.IPPROTO_TCP)
++    except socket.gaierror as e:
++        raise ValueError(f"cannot resolve image host {host!r}: {e}")
++    if not infos:
++        raise ValueError(f"cannot resolve image host {host!r}")
++    for info in infos:
++        ip = ipaddress.ip_address(info[4][0])
++        if getattr(ip, "ipv4_mapped", None) is not None:
++            ip = ip.ipv4_mapped
++        if not ip.is_global or ip.is_multicast:
++            raise ValueError(f"image host {host!r} resolves to a non-public "
++                             f"address ({ip}); refused")
++    family, _, _, _, sockaddr = infos[0]
++    return family, sockaddr
++
++
++def _pinned_connection(scheme, hostname, port, timeout):
++    """HTTP(S) connection whose TCP socket goes to the address validated by
++    _public_address, while Host header and TLS SNI/verification still use
++    the original hostname."""
++    import http.client, socket, ssl
++    port = port or (443 if scheme == "https" else 80)
++    family, sockaddr = _public_address(hostname)
++    sock = socket.socket(family, socket.SOCK_STREAM)
++    sock.settimeout(timeout)
++    try:
++        sock.connect((sockaddr[0], port) + tuple(sockaddr[2:]))
++    except BaseException:
++        sock.close()
++        raise
++    if scheme == "https":
++        sock = ssl.create_default_context().wrap_socket(sock, server_hostname = hostname)
++        conn = http.client.HTTPSConnection(hostname, port, timeout = timeout)
++    else:
++        conn = http.client.HTTPConnection(hostname, port, timeout = timeout)
++    conn.sock = sock        # pre-connected: http.client skips its own connect()
++    return conn
++
++
++def _fetch_image_url(url):
++    """GET a public http(s) image URL with redirects re-validated and the
++    body read in chunks up to _IMAGE_MAX_BYTES."""
++    import http.client, urllib.parse
++    for _ in range(_IMAGE_MAX_REDIRECTS + 1):
++        u = urllib.parse.urlsplit(url)
++        if u.scheme not in ("http", "https") or not u.hostname:
++            raise ValueError(f"unsupported image URL {url!r}")
++        if u.username or u.password:
++            raise ValueError("credentials in image URLs are not accepted")
++        conn = _pinned_connection(u.scheme, u.hostname, u.port, _IMAGE_FETCH_TIMEOUT)
++        try:
++            path = u.path or "/"
++            if u.query:
++                path += "?" + u.query
++            conn.request("GET", path, headers = {"User-Agent": "serve_openai-vision/1",
++                                                 "Accept": "image/*"})
++            resp = conn.getresponse()
++            if resp.status in (301, 302, 303, 307, 308):
++                loc = resp.getheader("Location")
++                if not loc:
++                    raise ValueError(f"redirect without Location from {url!r}")
++                url = urllib.parse.urljoin(url, loc)
++                continue
++            if resp.status != 200:
++                raise ValueError(f"image URL returned HTTP {resp.status}")
++            clen = resp.getheader("Content-Length")
++            if clen and clen.isdigit() and int(clen) > _IMAGE_MAX_BYTES:
++                raise ValueError(f"image exceeds {_IMAGE_MAX_BYTES >> 20} MiB")
++            chunks, total = [], 0
++            while True:
++                chunk = resp.read(1 << 16)
++                if not chunk:
++                    break
++                total += len(chunk)
++                if total > _IMAGE_MAX_BYTES:
++                    raise ValueError(f"image exceeds {_IMAGE_MAX_BYTES >> 20} MiB")
++                chunks.append(chunk)
++            return b"".join(chunks)
++        finally:
++            conn.close()
++    raise ValueError("too many redirects fetching image URL")
++
++
++def _load_image(url):
++    import base64, io
++    from PIL import Image
++    if url.startswith("data:"):
++        header, _, payload = url.partition(",")
++        if ";base64" not in header:
++            raise ValueError("only base64 data: URIs are supported")
++        if len(payload) * 3 // 4 > _IMAGE_MAX_BYTES:
++            raise ValueError(f"image exceeds {_IMAGE_MAX_BYTES >> 20} MiB")
++        raw = base64.b64decode(payload)
++    elif url.startswith(("http://", "https://")):
++        if not _ALLOW_IMAGE_URLS:
++            raise ValueError("remote image URLs are disabled on this server; "
++                             "send a base64 data: URI (or start with --allow_image_urls)")
++        raw = _fetch_image_url(url)
++    else:
++        raise ValueError("image_url must be a base64 data: URI or an http(s) URL")
++    img = Image.open(io.BytesIO(raw))
++    if img.width * img.height > _IMAGE_MAX_PIXELS:
++        raise ValueError(f"image is {img.width}x{img.height}; limit is "
++                         f"{_IMAGE_MAX_PIXELS / 1e6:g} MP")
++    return img.convert("RGB")
++
++
++def _image_embedding(vision_model, tokenizer, url):
++    import hashlib
++    key = hashlib.blake2b(url.encode("utf-8"), digest_size = 16).digest()
++    with _image_cache_lock:
++        hit = _image_cache.get(key)
++        if hit is not None and hit[0] == url:
++            _image_cache[key] = _image_cache.pop(key)
++            return hit[1]
++    mme = vision_model.get_image_embeddings(tokenizer = tokenizer,
++                                            image = _load_image(url))
++    with _image_cache_lock:
++        if len(_image_cache) >= _IMAGE_CACHE_CAP:
++            _image_cache.pop(next(iter(_image_cache)))
++        _image_cache[key] = (url, mme)
++    return mme
++
++
++def attach_images(messages, vision_model, tokenizer):
++    """OpenAI content-part lists -> plain template text.
++
++    Text parts are kept; image parts become the embedding's text alias (the
++    engine expands it to <vision_start> + image tokens + <vision_end>, so it
++    is placed directly in the text rather than through the template's
++    image placeholder, which this engine build does not expose).
++    Returns (messages, embeddings)."""
++    out, embeddings = [], []
++    for m in messages:
++        content = m.get("content")
++        if not isinstance(content, list):
++            out.append(m)
++            continue
++        pieces = []
++        for part in content:
++            ptype = part.get("type") if isinstance(part, dict) else None
++            if ptype == "text":
++                pieces.append(part.get("text") or "")
++            elif ptype == "image_url":
++                url = part.get("image_url")
++                if isinstance(url, dict):
++                    url = url.get("url")
++                if not url:
++                    raise ValueError("image_url part without a url")
++                if vision_model is None:
++                    raise ValueError("image input requires a server started with --vision")
++                mme = _image_embedding(vision_model, tokenizer, url)
++                embeddings.append(mme)
++                pieces.append(mme.text_alias)
++            else:
++                raise ValueError(f"unsupported content part type: {ptype!r}")
++        m = dict(m)
++        m["content"] = "\n".join(pieces)
++        out.append(m)
++    return out, embeddings
+@@ -278,0 +503,19 @@ def tool_choice_directive(tool_choice, tools):
++def render_input_ids(tokenizer, messages, tools, enable_thinking,
++                     reasoning_effort, embeddings = None):
++    """Render exactly the prompt that generation will consume."""
++    kwargs = {
++        "add_generation_prompt": True,
++        "enable_thinking": enable_thinking,
++        "tools": tools,
++    }
++    if reasoning_effort:
++        kwargs["reasoning_effort"] = reasoning_effort
++    if embeddings:
++        # Render to text, then tokenize with the embeddings so their aliases
++        # expand to image tokens.
++        rendered = tokenizer.hf_render_chat_template(messages, **kwargs)
++        return tokenizer.encode(rendered, encode_special_tokens = True,
++                                embeddings = embeddings)
++    return tokenizer.hf_chat_template(messages, **kwargs)
++
++
+@@ -280,2 +523,5 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
+-                  top_p, top_k, seed, tools, tool_choice = None, stop = None,
+-                  on_text = None):
++                  top_p, top_k, min_p, repetition_penalty,
++                  frequency_penalty, presence_penalty, seed, tools,
++                  tool_choice = None, stop = None, enable_thinking = True,
++                  reasoning_effort = "low", ignore_eos = False,
++                  on_text = None, embeddings = None):
+@@ -295,3 +541,3 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
+-    input_ids = tokenizer.hf_chat_template(
+-        messages, add_generation_prompt = True, enable_thinking = True,
+-        tools = tools)
++    input_ids = render_input_ids(
++        tokenizer, messages, tools, enable_thinking, reasoning_effort,
++        embeddings)
+@@ -309,2 +555,6 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
+-        sampler = ComboSampler(temperature = temperature, top_k = top_k, top_p = top_p)
+-        stop_conditions = ["<|im_end|>", tokenizer.eos_token_id] + (stop or [])
++        sampler = ComboSampler(
++            temperature = temperature, top_k = top_k, top_p = top_p,
++            min_p = min_p, rep_p = repetition_penalty,
++            freq_p = frequency_penalty, pres_p = presence_penalty)
++        stop_conditions = ((stop or []) if ignore_eos else
++                           ["<|im_end|>", tokenizer.eos_token_id] + (stop or []))
+@@ -313 +563,2 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
+-                  sampler = sampler, seed = seed)
++                  sampler = sampler, seed = seed,
++                  embeddings = embeddings or None)
+@@ -359 +610 @@ async def models(request):
+-        "id": "qwen3.8-27b-exl3-3.5bpw-wm",
++        "id": name,
+@@ -363 +614 @@ async def models(request):
+-    }]})
++    } for name in (MODEL_IDS or [MODEL_ID])]})
+@@ -371,0 +623 @@ async def health(request):
++            "vision": request.app.get("vision_model") is not None,
+@@ -377,0 +630,46 @@ async def health(request):
++async def version(request):
++    try:
++        import exllamav3
++        engine_version = getattr(exllamav3, "__version__", "unknown")
++    except Exception:
++        engine_version = "unknown"
++    return web.json_response({"version": engine_version, "backend": "exl3"})
++
++
++def _template_controls(body):
++    kwargs = body.get("chat_template_kwargs") or {}
++    if not isinstance(kwargs, dict):
++        kwargs = {}
++    enable_thinking = body.get("enable_thinking",
++                               kwargs.get("enable_thinking", True))
++    reasoning_effort = body.get("reasoning_effort",
++                                kwargs.get("reasoning_effort", "low"))
++    return bool(enable_thinking), str(reasoning_effort or "low")
++
++
++async def render_chat(request):
++    """vLLM-compatible prompt renderer used by benchmark_v2.py."""
++    try:
++        body = await request.json()
++    except Exception:
++        return web.json_response({"error": {"message": "invalid JSON"}}, status = 400)
++    messages = body.get("messages")
++    if not messages or not isinstance(messages, list):
++        return web.json_response(
++            {"error": {"message": "`messages` (list) is required"}}, status = 400)
++    enable_thinking, reasoning_effort = _template_controls(body)
++    try:
++        msgs, embeddings = attach_images(
++            normalize_messages(messages), request.app.get("vision_model"),
++            request.app["tokenizer"])
++        ids = render_input_ids(
++            request.app["tokenizer"], msgs,
++            body.get("tools") or None, enable_thinking, reasoning_effort,
++            embeddings)
++        token_ids = ids.reshape(-1).tolist()
++    except Exception as error:
++        return web.json_response(
++            {"error": {"message": f"prompt render: {error}"}}, status = 400)
++    return web.json_response({"token_ids": token_ids})
++
++
+@@ -386,0 +685,5 @@ def parse_request(body):
++    min_p = float(body.get("min_p", 0.0))
++    repetition_penalty = float(body.get("repetition_penalty", 1.0))
++    frequency_penalty = float(body.get("frequency_penalty", 0.0))
++    presence_penalty = float(body.get("presence_penalty", 0.0))
++    enable_thinking, reasoning_effort = _template_controls(body)
+@@ -397 +700,4 @@ def parse_request(body):
+-        top_p = top_p, top_k = top_k,
++        top_p = top_p, top_k = top_k, min_p = min_p,
++        repetition_penalty = repetition_penalty,
++        frequency_penalty = frequency_penalty,
++        presence_penalty = presence_penalty,
+@@ -401,0 +708,3 @@ def parse_request(body):
++        enable_thinking = enable_thinking,
++        reasoning_effort = reasoning_effort,
++        ignore_eos = bool(body.get("ignore_eos", False)),
+@@ -403 +712 @@ def parse_request(body):
+-        model_id = body.get("model", "qwen3.8-27b-exl3-3.5bpw-wm"),
++        model_id = body.get("model", MODEL_ID),
+@@ -427,0 +737,16 @@ async def chat_completions(request):
++    try:
++        # Embeds any images now (vision forward, off the event loop).
++        req["messages"], embeddings = await asyncio.to_thread(
++            attach_images, req["messages"], app.get("vision_model"), tokenizer)
++    except _IMAGE_REQUEST_ERRORS as e:
++        # Bad input: malformed data URI / undecodable image / unreachable URL.
++        return web.json_response(
++            {"error": {"message": f"image: {e}", "type": "invalid_request_error"}},
++            status = 400)
++    except Exception as e:
++        # Anything else (CUDA OOM in the vision forward, engine bugs) is ours.
++        print(f" !! image embedding failed: {e!r}", flush = True)
++        return web.json_response(
++            {"error": {"message": f"image embedding failed: {e}", "type": "server_error"}},
++            status = 500)
++
+@@ -433 +758,5 @@ async def chat_completions(request):
+-                req["seed"], req["tools"], req["tool_choice"], req["stop"])
++                req["min_p"], req["repetition_penalty"],
++                req["frequency_penalty"], req["presence_penalty"],
++                req["seed"], req["tools"], req["tool_choice"], req["stop"],
++                req["enable_thinking"], req["reasoning_effort"], req["ignore_eos"],
++                embeddings = embeddings)
+@@ -474,0 +804,2 @@ async def chat_completions(request):
++                    req["min_p"], req["repetition_penalty"],
++                    req["frequency_penalty"], req["presence_penalty"],
+@@ -476 +807,3 @@ async def chat_completions(request):
+-                    on_text = None if forced_choice else on_text)
++                    req["enable_thinking"], req["reasoning_effort"], req["ignore_eos"],
++                    on_text = None if forced_choice else on_text,
++                    embeddings = embeddings)
+@@ -478 +811 @@ async def chat_completions(request):
+-                                          ("done", (calls, finish, reasoning, content)))
++                    ("done", (calls, finish, reasoning, content, ptoks, otoks)))
+@@ -483 +816 @@ async def chat_completions(request):
+-        async def send(delta, finish = None):
++        async def send(delta, finish = None, usage = None):
+@@ -487,0 +821,2 @@ async def chat_completions(request):
++            if usage is not None:
++                obj["usage"] = usage
+@@ -492 +827 @@ async def chat_completions(request):
+-        in_think = [True]          # generation starts inside <think> (template)
++        in_think = [req["enable_thinking"]]
+@@ -556 +891 @@ async def chat_completions(request):
+-                calls, finish, reasoning, content = payload
++                calls, finish, reasoning, content, ptoks, otoks = payload
+@@ -568 +903,3 @@ async def chat_completions(request):
+-                await send({}, finish = finish)
++                await send({}, finish = finish, usage = {
++                    "prompt_tokens": ptoks, "completion_tokens": otoks,
++                    "total_tokens": ptoks + otoks})
+@@ -580 +917,2 @@ def main():
+-    global MODEL_DIR, DRAFT_DIR, PORT
++    global MODEL_DIR, DRAFT_DIR, PORT, MODEL_ID, MODEL_IDS
++    global _ALLOW_IMAGE_URLS, _IMAGE_MAX_BYTES, _IMAGE_MAX_PIXELS
+@@ -582,0 +921,4 @@ def main():
++    ap.add_argument("--served_model_name", default = None, nargs = "+",
++                    help = "Model ID(s) advertised by /v1/models; the first is "
++                           "canonical, the rest are aliases so existing clients "
++                           "keep working across lane switches")
+@@ -602,0 +945,10 @@ def main():
++    ap.add_argument("--vision", action = "store_true",
++                    help = "load the checkpoint's vision tower and accept "
++                           "image_url content parts")
++    ap.add_argument("--allow_image_urls", action = "store_true",
++                    help = "also fetch http(s) image_url values server-side "
++                           "(public destinations only; default: data: URIs only)")
++    ap.add_argument("--max_image_mb", type = int, default = 32,
++                    help = "max encoded bytes per image (data URI or fetched)")
++    ap.add_argument("--max_image_mp", type = float, default = 64,
++                    help = "max megapixels per image before decoding")
+@@ -603,0 +956,6 @@ def main():
++    _ALLOW_IMAGE_URLS = bool(args.allow_image_urls)
++    _IMAGE_MAX_BYTES = int(args.max_image_mb * 1024 * 1024)
++    _IMAGE_MAX_PIXELS = int(args.max_image_mp * 1e6)
++    if args.served_model_name:
++        MODEL_IDS = list(args.served_model_name)
++        MODEL_ID = MODEL_IDS[0]
+@@ -620,0 +979 @@ def main():
++          + (" + vision" if args.vision else "")
+@@ -622 +981,3 @@ def main():
+-    generator, tokenizer = build_model(argv, use_draft = use_draft)
++    generator, tokenizer, vision_model = build_model(
++        argv, use_draft = use_draft,
++        vision_model_dir = args.model if args.vision else None)
+@@ -628,0 +990 @@ def main():
++    app["vision_model"] = vision_model
+@@ -630,0 +993 @@ def main():
++    app.router.add_get("/version", version)
+@@ -631,0 +995 @@ def main():
++    app.router.add_post("/v1/chat/completions/render", render_chat)

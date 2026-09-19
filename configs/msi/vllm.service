@@ -1,0 +1,29 @@
+[Unit]
+Description=vLLM inference server (ThinkingCap-Qwen3.6-27B-NVFP4 + MTP + qwen3_xml tool parser, internal port 8101)
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/<user>
+ExecStart=/bin/bash /mnt/c/Users/<user>/serve-thinkingcap.sh
+# Contain worst-case FlashInfer JIT RAM spikes to this unit so the OOM killer
+# can never take out the user systemd manager / Tailscale bridge again
+# (see benchmarks/lane-assessments/report-msi-Qwen3.6-27B-official-NVFP4.md).
+MemoryHigh=34G
+MemoryMax=38G
+# Restart=always (not on-failure): the launcher has `set -euo pipefail`, so
+# `| tee` does NOT mask vLLM's exit code. The real problem is that vLLM
+# itself exits 0 after an EngineCore/worker crash (e.g. CUDA illegal memory
+# access on 2026-07-26 — the engine process dies but the Python process
+# returns 0), so on-failure never fires and the server stays down.
+# Restart=always catches this case.
+Restart=always
+RestartSec=10s
+TimeoutStartSec=600
+TimeoutStopSec=120
+KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

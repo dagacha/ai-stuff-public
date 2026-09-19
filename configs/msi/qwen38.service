@@ -1,0 +1,23 @@
+[Unit]
+Description=Production Qwen3.8-27B NVFP4 (vLLM, TurboQuant KV, thinking, MTP-3, 256K, internal port 8101)
+# ThinkingCap remains installed as the mutually exclusive rollback lane.
+Conflicts=vllm.service
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/<user>
+ExecStart=/bin/bash /mnt/c/Users/<user>/serve-qwen38.sh
+MemoryHigh=34G
+MemoryMax=38G
+# vLLM can return exit status 0 after an EngineCore failure; always restart.
+Restart=always
+RestartSec=10s
+TimeoutStartSec=600
+TimeoutStopSec=120
+KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,12 @@
+# 3-node ring NCCL all_gather, 2026-09-11 22:07 local, run on spark-head via run-nccl-ring.sh
+# (mpirun -np 3 -H 10.10.0.1:1,10.10.0.2:1,10.10.2.2:1, bootstrap on wlP9s9/192.168.1.0/24,
+#  NCCL_IB_HCA=rocep1s0f0,rocep1s0f1,roceP2p1s0f0,roceP2p1s0f1 NCCL_IB_SUBNET_AWARE_ROUTING=1 NCCL_IB_MERGE_NICS=0 NCCL_NET_PLUGIN=none
+#  all_gather_perf -b 16G -e 16G -f 2)
+# Ranks: 0 spark-head, 1 gn100-worker, 2 gx10-90f5 (spark-indie), one GB10 each
+# NCCL: zyang-dev/nccl branch dgxspark-3node-ring @ fab1850 (reports "NCCL version 2.29.7+cuda13.0"); nccl-tests 2.20.0 (b4d5bee)
+# Taken after removing the worker's iommu.passthrough=0 (the same command gave 3.0 GB/s before). Result lines as printed:
+#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
+#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
+ 17179869168    1431655764     float    none      -1   499675   34.38   22.92       0   498789   34.44   22.96       0
+# Out of bounds values : 0 OK
+# Avg bus bandwidth    : 22.9417 

@@ -1,0 +1,11 @@
+16:[glm53-exl3] image recipe 6a2d85df6c3196562e4559e63428cbed2f7df7000a72b7eabd65739a1fe0dbc9 != repo bbf0dd67fd7e — rebuilding (SKIP_BUILD=1 keeps GHCR)
+17:[glm53-exl3] building ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3 from Dockerfile stamp=bbf0dd67fd7e (log: /home/dgx/GLM-5.3-Flash-EXL3-2x-DGX-Sparks/logs/build-sm121.log) ...
+242:(Worker_TP0 pid=1603) INFO 09-07 15:15:46 [default_loader.py:430] Loading weights took 318.58 seconds
+243:(Worker_TP0 pid=1603) INFO 09-07 15:15:46 [exl3.py:541] exl3 e2 diag schema=2 configured_tier=grouped effective_tier=grouped tier_reason=grouped_ok shared_suh=1 shared_suh_layers=1/1 sym_exl3_moe=1 sym_fat_gemm=1 sym_fat_gemm_scatter=1 sym_fat_moe=1 grouped_eligible=1 grouped_calls=0 grouped_scratch_bytes=0 cap=12.1 cap_ok=1 tp_rank=0 tp_size=2 prefill_layer_calls=0 thin_calls=0 row_tile_calls
+295:(Worker_TP0 pid=1603) INFO 09-07 15:15:55 [default_loader.py:430] Loading weights took 7.29 seconds
+297:(Worker_TP0 pid=1603) INFO 09-07 15:15:56 [model_runner.py:374] Model loading took 82.05 GiB and 333.960812 seconds
+312:(Worker_TP0 pid=1603) INFO 09-07 15:16:10 [gpu_worker.py:564] Available KV cache memory: 14.67 GiB
+315:(EngineCore pid=1447) INFO 09-07 15:16:10 [kv_cache_utils.py:2300] GPU KV cache size: 827,142 tokens, Maximum concurrency for 700,000 tokens per request: 1.18x
+328:(Worker_TP0 pid=1603) INFO 09-07 15:17:07 [gpu_worker.py:790] Free memory on device (108.26/121.69 GiB) on startup. Desired GPU memory utilization is (0.86, 104.65 GiB). Actual usage is 85.42 GiB for consumed memory (weights + non-torch), 4.56 GiB for peak activation, and 0.05 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=15536308880` (14.47 GiB) to fi
+331:(EngineCore pid=1447) INFO 09-07 15:17:09 [core.py:363] init engine (profile, create kv cache, warmup model) took 72.94 s
+380:[glm53-exl3] health check passed after 490s — server is up

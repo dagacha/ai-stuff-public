@@ -1,0 +1,12 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #0D1117;
+    overflow: hidden; /* Prevent scrollbars */
+    user-select: none; /* Prevent text selection */
+    cursor: none; /* Hide default cursor during gameplay */
+}
+
+canvas {
+    display: block;
+}

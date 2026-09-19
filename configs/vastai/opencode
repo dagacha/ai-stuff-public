@@ -1,0 +1,23 @@
+#!/bin/bash
+# Wrapper for opencode that ensures `node` is on PATH.
+# The opencode-ai npm package shebangs `#!/usr/bin/env node`, but the
+# template's default /etc/environment PATH doesn't include the nvm node
+# directory, so non-interactive shells (e.g. /usr/local/bin invocations)
+# would otherwise fail with "node: No such file or directory".
+set -eu
+
+# Find a node binary. Prefer one already on PATH; fall back to nvm.
+if ! command -v node >/dev/null 2>&1; then
+    NODE_BIN=$(ls -d /opt/nvm/versions/node/v*/bin 2>/dev/null | sort -V | tail -1)
+    if [ -z "${NODE_BIN}" ]; then
+        NODE_BIN=$(ls -d /workspace/opt/nvm/versions/node/v*/bin 2>/dev/null | sort -V | tail -1)
+    fi
+    if [ -n "${NODE_BIN}" ]; then
+        export PATH="${NODE_BIN}:${PATH}"
+    else
+        echo "opencode wrapper: no node binary found in /opt/nvm or /workspace/opt/nvm" >&2
+        exit 127
+    fi
+fi
+
+exec /workspace/opt/npm-global/bin/opencode "$@"

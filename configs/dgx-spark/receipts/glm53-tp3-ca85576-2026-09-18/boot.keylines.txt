@@ -1,0 +1,57 @@
+# ./stop.sh tp3 && ./start-tp3.sh — 2026-09-18 12:05 BST (11:05 UTC), recipe ca85576, head spark-head
+# launcher (stdout, ANSI stripped)
+[glm53-exl3-tp3] removing the rank NFS volumes (the exporter stays up) ...
+[glm53-exl3-tp3] NFS_SHARE=1 — ranks read the head HF cache, no per-rank copy to size for
+[glm53-exl3-tp3] building ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor from Dockerfile stamp=b12244e3ba09 (log: /home/dgx/GLM-5.3-Flash-EXL3-2x-DGX-Sparks/logs/build-sm121.log) ...
+[glm53-exl3-tp3] shipping ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor (linux/arm64, ~19.5 GiB) to rank 1 via docker save | ssh docker load ...
+Loaded image: ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor
+[glm53-exl3-tp3] shipping ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor (linux/arm64, ~19.5 GiB) to rank 2 via docker save | ssh docker load ...
+Loaded image: ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor
+[glm53-exl3-tp3] GPU EXL3 self-check on ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor (log: /home/dgx/GLM-5.3-Flash-EXL3-2x-DGX-Sparks/logs/overlay-verify.log) ...
+[glm53-exl3-tp3] NFS already up (glm53-nfs) — merging rank clients into its exports
+[glm53-exl3-tp3] rank 1 (dgx@10.10.2.2): docker volume glm53-weights -> nfs://10.10.2.1:/
+[glm53-exl3-tp3] rank 1: sees models--Mia-AiLab--GLM-5.3-Flash-EXL3-TR3-4bpw over NFS
+[glm53-exl3-tp3] rank 2 (dgx@10.10.0.2): docker volume glm53-weights -> nfs://10.10.0.1:/
+[glm53-exl3-tp3] rank 2: sees models--Mia-AiLab--GLM-5.3-Flash-EXL3-TR3-4bpw over NFS
+[glm53-exl3-tp3] rank(s) 1 2 read the head's HF cache over NFS — no local copy
+[glm53-exl3-tp3] config: image=ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor tp=3 nnodes=3 quant=exl3 spec=dflash mtp=2 dflash_k=7 max-len=1000000 gpu-util=0.80 kv=fp8 lm-only=0 port=8888 adaptive-k=off set=2,4,7 alpha=0.25 dense_fp8=dense,kda overlay=/home/dgx/GLM-5.3-Flash-EXL3-2x-DGX-Sparks/overlay/exl3.py coop_geometry= flashkda=0 fat_grouped=1 temp_rows=32
+[glm53-exl3-tp3] drafter (SWA) prefix-cache retention interval: 0 (all ranks)
+[glm53-exl3-tp3] health check passed after 230s — server is up
+boot-shape-warmup: 24/24 requests ok in 64s
+[glm53-exl3-tp3] GLM-5.3-Flash EXL3 is UP (TP=3, nnodes=3)
+exit=0
+
+# head rank 0 engine (docker logs glm53-exl3-tp3-head)
+scheduler.py: # [glm53-decode-floor:v5] already present — verified
+patched kv_cache_coordinator.py (hybrid APC + versioned DFlash SWA replay clamp)
+patched kv_cache_coordinator.py (per-group APC retention + DFlash replay/free ordering; VLLM_PREFIX_CACHE_RETENTION_INTERVAL_SWA drives the DFlash2 drafter group)
+[glm53-exl3-head] launching: vllm serve /root/.cache/huggingface/hub/models--Mia-AiLab--GLM-5.3-Flash-EXL3-TR3-4bpw/snapshots/25a44fdbf16862a46b7cc9921142c6c81350af2f --served-model-name GLM-5.3-Flash-EXL3 --host 0.0.0.0 --port 8888 --tensor-parallel-size 3 --nnodes 3 --node-rank 0 --master-addr 10.10.0.1 --master-port 29521 --distributed-executor-backend mp --tool-call-parser glm47 --enable-auto-tool-choice --reasoning-parser glm45 --enable-prefix-caching --no-enable-flashinfer-autotune --hf-overrides {"num_attention_heads":66,"num_key_value_heads":66,"linear_num_heads":66,"text_config":{"num
+(Worker_TP0_EP0 pid=2571) INFO 09-18 11:15:05 [default_loader.py:430] Loading weights took 44.58 seconds
+(Worker_TP0_EP0 pid=2571) WARNING 09-18 11:15:06 [exl3.py:1877] [glm53-dense-fp8] TP=3 keeps KDA f_b_proj/g_b_proj in BF16 because their merged-projection views violate Marlin input pitch/alignment requirements
+(Worker_TP0_EP0 pid=2571) INFO 09-18 11:15:10 [default_loader.py:430] Loading weights took 1.85 seconds
+(Worker_TP0_EP0 pid=2571) INFO 09-18 11:15:10 [model_runner.py:374] Model loading took 54.25 GiB and 52.179888 seconds
+(Worker_TP0_EP0 pid=2571) INFO 09-18 11:15:24 [gpu_worker.py:564] Available KV cache memory: 33.22 GiB
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:2573] GPU KV cache size: 2,656,934 tokens, Maximum concurrency for 1,000,000 tokens per request: 2.66x
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] group 0: MLAAttentionSpec layers=22 block_size=2560 page_size=84,480 B blocks/request@1,000,000=391 prefix_caching=yes
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] group 1: KpoolTailSpec layers=11 block_size=4 page_size=84,480 B blocks/request@1,000,000=1 prefix_caching=no (scratch) window=4 eagle=no
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] group 2: MambaSpec layers=9 block_size=2560 page_size=1,679,360 B blocks/request@1,000,000=9 prefix_caching=yes mamba_cache_mode=align
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] group 3: MambaSpec layers=9 block_size=2560 page_size=1,679,360 B blocks/request@1,000,000=9 prefix_caching=yes mamba_cache_mode=align
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] group 4: MambaSpec layers=8 block_size=2560 page_size=1,679,360 B blocks/request@1,000,000=9 prefix_caching=yes mamba_cache_mode=align
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] group 5: MambaSpec layers=8 block_size=2560 page_size=1,679,360 B blocks/request@1,000,000=9 prefix_caching=yes mamba_cache_mode=align
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] group 6: SlidingWindowSpec layers=5 block_size=64 page_size=1,679,360 B blocks/request@1,000,000=257 prefix_caching=yes window=2048 eagle=yes
+(EngineCore pid=2374) INFO 09-18 11:15:24 [kv_cache_utils.py:1208] [glm53-kv-capacity-log] usable block ids: 1819 (num_blocks=1820 incl. the null block; 685 ids per 1,000,000-token request => 2.66x); ids per 2560-token cached segment across groups: 38 (per group: [1, 0, 1, 1, 1, 1, 33]); cached-conversation capacity at this alignment ≈ 120,320 tokens = 47 segments (aligned dense-retention prefix-cache upper bound: nothing running, every reachable block hashed, block-aligned hits). The 'GPU KV cache size' line above is max_concurrency x max_model_len, not this figure.
+(EngineCore pid=2374) [glm53-decode-floor] fair v5 probe_chunk=256 ladder=128..2048 share=0.3 interval_s=2.0 max_step_s=2.0 max_chunks=1
+
+# rank 1 (10.10.2.2) glm53-exl3-tp3-w1
+(Worker_TP1_EP1 pid=2438) INFO 09-18 11:15:05 [default_loader.py:430] Loading weights took 44.81 seconds
+(Worker_TP1_EP1 pid=2438) WARNING 09-18 11:15:05 [exl3.py:1877] [glm53-dense-fp8] TP=3 keeps KDA f_b_proj/g_b_proj in BF16 because their merged-projection views violate Marlin input pitch/alignment requirements
+(Worker_TP1_EP1 pid=2438) INFO 09-18 11:15:09 [default_loader.py:430] Loading weights took 2.68 seconds
+(Worker_TP1_EP1 pid=2438) INFO 09-18 11:15:10 [model_runner.py:374] Model loading took 54.25 GiB and 52.087240 seconds
+:/ on /var/lib/docker/volumes/glm53-weights/_data type nfs4 (ro,relatime,vers=4.2,rsize=1048576,wsize=1048576,namlen=255,hard,fatal_neterrors=none,proto=tcp,nconnect=8,timeo=600,retrans=2,sec=sys,clientaddr=10.10.2.2,local_lock=none,addr=10.10.2.1)
+
+# rank 2 (10.10.0.2) glm53-exl3-tp3-w2
+(Worker_TP2_EP2 pid=2388) INFO 09-18 11:15:05 [default_loader.py:430] Loading weights took 44.84 seconds
+(Worker_TP2_EP2 pid=2388) WARNING 09-18 11:15:06 [exl3.py:1877] [glm53-dense-fp8] TP=3 keeps KDA f_b_proj/g_b_proj in BF16 because their merged-projection views violate Marlin input pitch/alignment requirements
+(Worker_TP2_EP2 pid=2388) INFO 09-18 11:15:09 [default_loader.py:430] Loading weights took 2.64 seconds
+(Worker_TP2_EP2 pid=2388) INFO 09-18 11:15:10 [model_runner.py:374] Model loading took 54.25 GiB and 52.122395 seconds
+:/ on /var/lib/docker/volumes/glm53-weights/_data type nfs4 (ro,relatime,vers=4.2,rsize=1048576,wsize=1048576,namlen=255,hard,fatal_neterrors=none,proto=tcp,nconnect=8,timeo=600,retrans=2,sec=sys,clientaddr=10.10.0.2,local_lock=none,addr=10.10.0.1)

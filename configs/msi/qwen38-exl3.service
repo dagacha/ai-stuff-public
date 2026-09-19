@@ -1,0 +1,22 @@
+[Unit]
+Description=Production Qwen3.8-27B EXL3 5.5bpw (exllamav3, MTP, vision, NVFP4 KV, 256K, internal port 8101)
+# The vLLM Qwen3.8 lane (qwen38.service) and ThinkingCap (vllm.service) are the
+# mutually exclusive rollback lanes; one GPU tenant at a time.
+Conflicts=qwen38.service vllm.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/<user>
+ExecStart=/bin/bash /mnt/c/Users/<user>/serve-qwen38-exl3.sh
+MemoryHigh=30G
+MemoryMax=36G
+Restart=always
+RestartSec=10s
+TimeoutStartSec=600
+TimeoutStopSec=60
+KillSignal=SIGINT
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

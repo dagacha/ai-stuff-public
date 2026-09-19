@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "vast-llama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Vast llama-server",
+      "options": {
+        "baseURL": "https://<vastai-node>.<tailnet>.ts.net:8443/v1",
+        "apiKey": "unused"
+      },
+      "models": {
+        "gemma-4-31b": {
+          "name": "Gemma-4-31B (GGUF Q4_K_XL, 131K)"
+        }
+      }
+    }
+  },
+  "model": "vast-llama/gemma-4-31b"
+}

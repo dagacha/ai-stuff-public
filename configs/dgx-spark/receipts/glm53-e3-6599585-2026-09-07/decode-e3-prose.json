@@ -1,0 +1,167 @@
+{
+  "phase": "e3",
+  "health_code": 200,
+  "health_body": "",
+  "runs": [
+    {
+      "http": 200,
+      "ttft_s": 0.255765937268734,
+      "wall_s": 6.869632130488753,
+      "decode_s": 6.613866193220019,
+      "tok_s": 30.088301484538363,
+      "delivered_tok_s": 29.11364046880493,
+      "completion_tokens": 200,
+      "prompt_tokens": 40,
+      "finish_reason": "length",
+      "nan": false,
+      "text_head": "# How a Hash Map Works: A Complete Guide\n\n## Overview\n\nA hash map (also called a hash table or dictionary) is a data structure that stores key-value pairs and provides near-constant-time lookup, insertion, and deletion. It works by using a **hash function** to convert a key into an index in an underlying array, allowing direct access to data without searching.\n\n---\n\n## 1. Core Components\n\n### The ",
+      "text": "# How a Hash Map Works: A Complete Guide\n\n## Overview\n\nA hash map (also called a hash table or dictionary) is a data structure that stores key-value pairs and provides near-constant-time lookup, insertion, and deletion. It works by using a **hash function** to convert a key into an index in an underlying array, allowing direct access to data without searching.\n\n---\n\n## 1. Core Components\n\n### The Underlying Array\nA hash map is built on top of a fixed-size array called the **bucket array**. Each slot in this array is called a **bucket** or **slot**.\n\n### The Hash Function\nA hash function takes a key and converts it into an integer. This integer is then mapped to a valid array index:\n\n```\nindex = hash(key) % array_size\n```\n\nA good hash function should:\n- **Be deterministic**: The same key always produces the same hash\n- **Distribute uniformly**: Spread keys evenly across buckets to",
+      "text_len": 892,
+      "usage": {
+        "prompt_tokens": 40,
+        "total_tokens": 240,
+        "completion_tokens": 200
+      },
+      "spec": {
+        "drafts": 54,
+        "draft_tokens": 378,
+        "accepted": 146,
+        "accept_ratio": 0.3862,
+        "accepted_per_step": 2.704,
+        "pos": [
+          0.8889,
+          0.6111,
+          0.4259,
+          0.3148,
+          0.2037,
+          0.1296,
+          0.1296
+        ]
+      }
+    },
+    {
+      "http": 200,
+      "ttft_s": 0.2721659494563937,
+      "wall_s": 7.544889113865793,
+      "decode_s": 7.272723164409399,
+      "tok_s": 27.362515456912806,
+      "delivered_tok_s": 26.508010519657,
+      "completion_tokens": 200,
+      "prompt_tokens": 40,
+      "finish_reason": "length",
+      "nan": false,
+      "text_head": "# How a Hash Map Works: A Complete Guide\n\n## Overview\n\nA hash map (also called a hash table or dictionary) is a data structure that stores key-value pairs and provides near-constant-time lookup, insertion, and deletion. It works by using a **hash function** to convert a key into an index in an underlying array, allowing direct access to data without searching.\n\n---\n\n## 1. Core Components\n\n### The ",
+      "text": "# How a Hash Map Works: A Complete Guide\n\n## Overview\n\nA hash map (also called a hash table or dictionary) is a data structure that stores key-value pairs and provides near-constant-time lookup, insertion, and deletion. It works by using a **hash function** to convert a key into an index in an underlying array, allowing direct access to data without searching.\n\n---\n\n## 1. Core Components\n\n### The Backing Array\nAt its heart, a hash map is an array (often called \"buckets\" or \"slots\"). If we could magically convert any key into a valid array index, we could access any element in a single step.\n\n### The Hash Function\nA hash function takes a key of any type (string, number, object) and converts it into an integer. This integer is then mapped to a valid array index, typically using the modulo operation:\n\n```\nindex = hash(key) % array_size\n```\n\n**Good hash functions have these properties:",
+      "text_len": 894,
+      "usage": {
+        "prompt_tokens": 40,
+        "total_tokens": 240,
+        "completion_tokens": 200
+      },
+      "spec": {
+        "drafts": 59,
+        "draft_tokens": 413,
+        "accepted": 144,
+        "accept_ratio": 0.3487,
+        "accepted_per_step": 2.441,
+        "pos": [
+          0.8305,
+          0.5932,
+          0.3898,
+          0.2881,
+          0.1864,
+          0.1017,
+          0.0508
+        ]
+      }
+    },
+    {
+      "http": 200,
+      "ttft_s": 0.3697444871068001,
+      "wall_s": 8.211365706287324,
+      "decode_s": 7.841621219180524,
+      "tok_s": 25.37740531425416,
+      "delivered_tok_s": 24.356484311356745,
+      "completion_tokens": 200,
+      "prompt_tokens": 40,
+      "finish_reason": "length",
+      "nan": false,
+      "text_head": "# How a Hash Map Works: A Complete Guide\n\n## Overview\n\nA hash map (also called a hash table or dictionary) is a data structure that stores key-value pairs and provides near-constant-time lookup, insertion, and deletion. It works by using a **hash function** to convert a key into an index in an underlying array, allowing direct access to data without searching.\n\n---\n\n## 1. Core Components\n\n### The ",
+      "text": "# How a Hash Map Works: A Complete Guide\n\n## Overview\n\nA hash map (also called a hash table or dictionary) is a data structure that stores key-value pairs and provides near-constant-time lookup, insertion, and deletion. It works by using a **hash function** to convert a key into an index in an underlying array, allowing direct access to data without searching.\n\n---\n\n## 1. Core Components\n\n### The Backing Array\nAt its heart, a hash map is an array. Arrays offer O(1) access by index, but array indices are integers (0, 1, 2...), while hash map keys can be strings, numbers, or objects. The hash function bridges this gap.\n\n### The Hash Function\nA hash function takes a key and produces an integer. A good hash function has these properties:\n\n- **Deterministic**: The same key always produces the same hash value\n- **Uniform distribution**: Keys spread evenly across available indices\n- **",
+      "text_len": 891,
+      "usage": {
+        "prompt_tokens": 40,
+        "total_tokens": 240,
+        "completion_tokens": 200
+      },
+      "spec": {
+        "drafts": 58,
+        "draft_tokens": 406,
+        "accepted": 143,
+        "accept_ratio": 0.3522,
+        "accepted_per_step": 2.466,
+        "pos": [
+          0.7759,
+          0.6034,
+          0.3966,
+          0.2759,
+          0.2241,
+          0.1207,
+          0.069
+        ]
+      }
+    }
+  ],
+  "ts": 1788794325.1506016,
+  "prompt": "hashmap-prose",
+  "thinking": false,
+  "temperature": 0,
+  "tok_s_median": 27.362515456912806,
+  "tok_s_min": 25.37740531425416,
+  "tok_s_max": 30.088301484538363,
+  "ttft_median_s": 0.2721659494563937,
+  "completion_tokens_median": 200.0,
+  "accept_ratio_median": 0.3522,
+  "accepted_per_step_median": 2.466,
+  "any_nan": false,
+  "coherence": {
+    "paris": {
+      "ok": true,
+      "text": "Paris",
+      "http": 200
+    },
+    "cmp": {
+      "ok": true,
+      "text": "Yes \u2014 9.9 is greater than 9.11 because 9.90 is larger than 9.11 when compared at the same decimal precision.",
+      "http": 200
+    },
+    "sky": {
+      "ok": true,
+      "text": "The sky-blue paint on the nursery walls seemed to glow softly in the morning light, like a piece of clear summer sky brought indoors.",
+      "http": 200
+    },
+    "nan": false
+  },
+  "coherent": true,
+  "health_code_after": 200,
+  "short_after": {
+    "http": 200,
+    "ttft_s": 0.3771995920687914,
+    "wall_s": 0.7341058123856783,
+    "decode_s": 0.3569062203168869,
+    "tok_s": 19.612995239435442,
+    "delivered_tok_s": 10.897611577276312,
+    "completion_tokens": 8,
+    "prompt_tokens": 40,
+    "finish_reason": "length",
+    "nan": false,
+    "text_head": "# How a Hash Map Works: A",
+    "text": "# How a Hash Map Works: A",
+    "text_len": 25,
+    "usage": {
+      "prompt_tokens": 40,
+      "total_tokens": 48,
+      "completion_tokens": 8
+    }
+  }
+}

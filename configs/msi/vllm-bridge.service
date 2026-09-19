@@ -1,0 +1,15 @@
+[Unit]
+Description=TCP forwarder bridging public MSI port to the vLLM upstream
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/<user>
+ExecStart=/bin/bash /mnt/c/Users/<user>/vllm-bridge.sh
+Restart=always
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

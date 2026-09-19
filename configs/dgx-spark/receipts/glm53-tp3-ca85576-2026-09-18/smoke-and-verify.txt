@@ -1,0 +1,31 @@
+# 2026-09-18 ~12:25 BST, head, right after UP
+$ curl -s http://127.0.0.1:8888/v1/chat/completions -d {"model":"GLM-5.3-Flash-EXL3","messages":[{"role":"user","content":"Reply with one short sentence: what is a tensor?"}],"max_tokens":60,"chat_template_kwargs":{"enable_thinking":false}}
+A tensor is a mathematical object that generalizes scalars, vectors, and matrices to represent multi-dimensional arrays of numbers, with properties that transform in specific ways under coordinate changes.
+usage: prompt_tokens 17, completion_tokens 36, total 53; wall 1.34 s
+
+# containers
+glm53-exl3-tp3-head	ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor	Up 6 hours
+glm53-nfs	glm53-nfs:local	Up 3 days
+glm53-exl3-tp3-w1	ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor	Up 6 hours
+glm53-exl3-tp3-w2	ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor	Up 6 hours
+
+# image
+ghcr.io/miaai-lab/glm-5.3-flash-2x-dgx-sparks:exl3-instanttensor 4065c55f38f2 20.9GB
+
+# head host memory after boot
+               total        used        free      shared  buff/cache   available
+Mem:             121         108           4           0          11          13
+
+# persistent ring routes (netplan get, not applied live)
+== 10.10.2.2
+- to: "10.10.0.1/32"
+  via: "10.10.2.1"
+- to: "10.10.0.2/32"
+  via: "10.10.4.1"
+10.10.0.1 via 10.10.2.1 dev enp1s0f0np0 
+10.10.0.2 via 10.10.4.1 dev enp1s0f1np1 
+== 10.10.0.2
+- to: "10.10.2.2/32"
+  via: "10.10.4.2"
+null
+10.10.2.2 via 10.10.4.2 dev enp1s0f0np0 

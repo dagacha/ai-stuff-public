@@ -1,0 +1,7 @@
+{
+  "model": "qwen3.6-27b-nvfp4",
+  "messages": [{"role": "user", "content": "Reply with just OK"}],
+  "max_tokens": 16,
+  "tool_choice": "auto",
+  "tools": [{"type":"function","function":{"name":"noop","description":"no op","parameters":{"type":"object","properties":{}}}}]
+}
