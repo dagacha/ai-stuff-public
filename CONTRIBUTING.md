@@ -1,7 +1,7 @@
 # Contributing to ai-stuff
 
-Thanks for your interest. This repo is the public mirror of a private
-operations knowledge base, so contribution flow is a little unusual — here's
+Thanks for your interest. This is the public mirror of my personal ops
+knowledge base, so contribution flow is a little unusual — here's
 what works.
 
 ## What's welcome
