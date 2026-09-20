@@ -2,7 +2,7 @@
 
 **Status:** active — verified 2026-09-02
 
-Operational notes, setup guides, and benchmark results for running local LLM infrastructure and AI agent frameworks — on DGX Spark clusters, Windows/WSL2 workstations, cloud GPUs, and Apple Silicon. This is the public mirror of my personal ops knowledge base; private ops notes and unrelated tooling live in a separate private repo.
+Operational notes, setup guides, and benchmark results for running local LLM infrastructure and AI agent frameworks — on DGX Spark clusters, Windows/WSL2 workstations, cloud GPUs, and Apple Silicon. This is the public mirror of my personal ops knowledge base.
 
 > **Not production software** — this repo contains operational notes, setup guides, research artifacts, and benchmark results. No secrets are committed. Most docs reference 2026-05/06; some configs reference models that may have changed.
 
