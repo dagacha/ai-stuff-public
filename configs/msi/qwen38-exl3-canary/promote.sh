@@ -12,6 +12,9 @@ echo "== install launcher + unit"
 cp "$ROOT/configs/msi/serve-qwen38-exl3.sh" /mnt/c/Users/<user>/serve-qwen38-exl3.sh
 cp "$ROOT/configs/msi/qwen38-exl3.service" ~/.config/systemd/user/qwen38-exl3.service
 systemctl --user daemon-reload
+# The launcher honors QWEN38_EXL3_ARM_ENV (a temporary-rollback hook that persists in
+# the user manager); clear it so the installed launcher serves its default arm.
+systemctl --user unset-environment QWEN38_EXL3_ARM_ENV
 
 echo "== flip enabled lane: qwen38 -> qwen38-exl3"
 systemctl --user disable qwen38.service 2>/dev/null || true

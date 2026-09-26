@@ -58,7 +58,7 @@ index b7e7d47..f185a20 100755
 +fi
 +
 diff --git a/tools/serve_openai.py b/tools/serve_openai.py
-index 23d22e4..6659e6a 100644
+index 23d22e4..595d1da 100644
 --- a/tools/serve_openai.py
 +++ b/tools/serve_openai.py
 @@ -11,0 +12 @@ Endpoints:
@@ -296,7 +296,7 @@ index 23d22e4..6659e6a 100644
 +        m["content"] = "\n".join(pieces)
 +        out.append(m)
 +    return out, embeddings
-@@ -278,0 +503,19 @@ def tool_choice_directive(tool_choice, tools):
+@@ -278,0 +503,20 @@ def tool_choice_directive(tool_choice, tools):
 +def render_input_ids(tokenizer, messages, tools, enable_thinking,
 +                     reasoning_effort, embeddings = None):
 +    """Render exactly the prompt that generation will consume."""
@@ -316,7 +316,8 @@ index 23d22e4..6659e6a 100644
 +    return tokenizer.hf_chat_template(messages, **kwargs)
 +
 +
-@@ -280,2 +523,5 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
++
+@@ -280,2 +524,5 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
 -                  top_p, top_k, seed, tools, tool_choice = None, stop = None,
 -                  on_text = None):
 +                  top_p, top_k, min_p, repetition_penalty,
@@ -324,35 +325,38 @@ index 23d22e4..6659e6a 100644
 +                  tool_choice = None, stop = None, enable_thinking = True,
 +                  reasoning_effort = "low", ignore_eos = False,
 +                  on_text = None, embeddings = None):
-@@ -295,3 +541,3 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
+@@ -295,3 +542,3 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
 -    input_ids = tokenizer.hf_chat_template(
 -        messages, add_generation_prompt = True, enable_thinking = True,
 -        tools = tools)
 +    input_ids = render_input_ids(
 +        tokenizer, messages, tools, enable_thinking, reasoning_effort,
 +        embeddings)
-@@ -309,2 +555,6 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
+@@ -309,3 +556,8 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
 -        sampler = ComboSampler(temperature = temperature, top_k = top_k, top_p = top_p)
 -        stop_conditions = ["<|im_end|>", tokenizer.eos_token_id] + (stop or [])
+-        job = Job(input_ids = input_ids, max_new_tokens = max_tokens,
++        gen_max = int(max_tokens)
 +        sampler = ComboSampler(
 +            temperature = temperature, top_k = top_k, top_p = top_p,
 +            min_p = min_p, rep_p = repetition_penalty,
 +            freq_p = frequency_penalty, pres_p = presence_penalty)
 +        stop_conditions = ((stop or []) if ignore_eos else
 +                           ["<|im_end|>", tokenizer.eos_token_id] + (stop or []))
-@@ -313 +563,2 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
++        job = Job(input_ids = input_ids, max_new_tokens = gen_max,
+@@ -313 +565,2 @@ def generate_full(generator, tokenizer, messages, max_tokens, temperature,
 -                  sampler = sampler, seed = seed)
 +                  sampler = sampler, seed = seed,
 +                  embeddings = embeddings or None)
-@@ -359 +610 @@ async def models(request):
+@@ -359 +612 @@ async def models(request):
 -        "id": "qwen3.8-27b-exl3-3.5bpw-wm",
 +        "id": name,
-@@ -363 +614 @@ async def models(request):
+@@ -363 +616 @@ async def models(request):
 -    }]})
 +    } for name in (MODEL_IDS or [MODEL_ID])]})
-@@ -371,0 +623 @@ async def health(request):
+@@ -371,0 +625 @@ async def health(request):
 +            "vision": request.app.get("vision_model") is not None,
-@@ -377,0 +630,46 @@ async def health(request):
+@@ -377,0 +632,70 @@ async def health(request):
 +async def version(request):
 +    try:
 +        import exllamav3
@@ -362,15 +366,39 @@ index 23d22e4..6659e6a 100644
 +    return web.json_response({"version": engine_version, "backend": "exl3"})
 +
 +
++_EFFORT_ALIASES = {"high": "xhigh", "max": "xhigh", "minimal": "low", "min": "low"}
++_EFFORT_OFF = {"off", "none", "disabled", "false"}
++_VALID_EFFORTS = {"low", "medium", "xhigh"}
++
++
 +def _template_controls(body):
++    """Map agent effort names onto Qwen3.8's tokenizer (low/medium/xhigh)."""
 +    kwargs = body.get("chat_template_kwargs") or {}
 +    if not isinstance(kwargs, dict):
 +        kwargs = {}
++    thinking = body.get("thinking") if isinstance(body.get("thinking"), dict) else {}
++    reasoning = body.get("reasoning") if isinstance(body.get("reasoning"), dict) else {}
 +    enable_thinking = body.get("enable_thinking",
 +                               kwargs.get("enable_thinking", True))
-+    reasoning_effort = body.get("reasoning_effort",
-+                                kwargs.get("reasoning_effort", "low"))
-+    return bool(enable_thinking), str(reasoning_effort or "low")
++    ttype = str(thinking.get("type") or "").strip().lower()
++    if ttype in _EFFORT_OFF:
++        enable_thinking = False
++    elif ttype in {"enabled", "on", "true"}:
++        enable_thinking = True
++    effort = body.get("reasoning_effort")
++    if effort is None:
++        effort = reasoning.get("effort")
++    if effort is None:
++        effort = kwargs.get("reasoning_effort", "low")
++    effort = str(effort or "low").strip().lower()
++    if effort in _EFFORT_OFF:
++        enable_thinking = False
++        effort = "low"
++    else:
++        effort = _EFFORT_ALIASES.get(effort, effort)
++        if effort not in _VALID_EFFORTS:
++            effort = "low"
++    return bool(enable_thinking), effort
 +
 +
 +async def render_chat(request):
@@ -399,26 +427,29 @@ index 23d22e4..6659e6a 100644
 +    return web.json_response({"token_ids": token_ids})
 +
 +
-@@ -386,0 +685,5 @@ def parse_request(body):
+@@ -383 +707 @@ def parse_request(body):
+-                     body.get("max_completion_tokens") or 1024)
++                     body.get("max_completion_tokens") or 32768)
+@@ -386,0 +711,5 @@ def parse_request(body):
 +    min_p = float(body.get("min_p", 0.0))
 +    repetition_penalty = float(body.get("repetition_penalty", 1.0))
 +    frequency_penalty = float(body.get("frequency_penalty", 0.0))
 +    presence_penalty = float(body.get("presence_penalty", 0.0))
 +    enable_thinking, reasoning_effort = _template_controls(body)
-@@ -397 +700,4 @@ def parse_request(body):
+@@ -397 +726,4 @@ def parse_request(body):
 -        top_p = top_p, top_k = top_k,
 +        top_p = top_p, top_k = top_k, min_p = min_p,
 +        repetition_penalty = repetition_penalty,
 +        frequency_penalty = frequency_penalty,
 +        presence_penalty = presence_penalty,
-@@ -401,0 +708,3 @@ def parse_request(body):
+@@ -401,0 +734,3 @@ def parse_request(body):
 +        enable_thinking = enable_thinking,
 +        reasoning_effort = reasoning_effort,
 +        ignore_eos = bool(body.get("ignore_eos", False)),
-@@ -403 +712 @@ def parse_request(body):
+@@ -403 +738 @@ def parse_request(body):
 -        model_id = body.get("model", "qwen3.8-27b-exl3-3.5bpw-wm"),
 +        model_id = body.get("model", MODEL_ID),
-@@ -427,0 +737,16 @@ async def chat_completions(request):
+@@ -427,0 +763,16 @@ async def chat_completions(request):
 +    try:
 +        # Embeds any images now (vision forward, off the event loop).
 +        req["messages"], embeddings = await asyncio.to_thread(
@@ -435,51 +466,51 @@ index 23d22e4..6659e6a 100644
 +            {"error": {"message": f"image embedding failed: {e}", "type": "server_error"}},
 +            status = 500)
 +
-@@ -433 +758,5 @@ async def chat_completions(request):
+@@ -433 +784,5 @@ async def chat_completions(request):
 -                req["seed"], req["tools"], req["tool_choice"], req["stop"])
 +                req["min_p"], req["repetition_penalty"],
 +                req["frequency_penalty"], req["presence_penalty"],
 +                req["seed"], req["tools"], req["tool_choice"], req["stop"],
 +                req["enable_thinking"], req["reasoning_effort"], req["ignore_eos"],
 +                embeddings = embeddings)
-@@ -474,0 +804,2 @@ async def chat_completions(request):
+@@ -474,0 +830,2 @@ async def chat_completions(request):
 +                    req["min_p"], req["repetition_penalty"],
 +                    req["frequency_penalty"], req["presence_penalty"],
-@@ -476 +807,3 @@ async def chat_completions(request):
+@@ -476 +833,3 @@ async def chat_completions(request):
 -                    on_text = None if forced_choice else on_text)
 +                    req["enable_thinking"], req["reasoning_effort"], req["ignore_eos"],
 +                    on_text = None if forced_choice else on_text,
 +                    embeddings = embeddings)
-@@ -478 +811 @@ async def chat_completions(request):
+@@ -478 +837 @@ async def chat_completions(request):
 -                                          ("done", (calls, finish, reasoning, content)))
 +                    ("done", (calls, finish, reasoning, content, ptoks, otoks)))
-@@ -483 +816 @@ async def chat_completions(request):
+@@ -483 +842 @@ async def chat_completions(request):
 -        async def send(delta, finish = None):
 +        async def send(delta, finish = None, usage = None):
-@@ -487,0 +821,2 @@ async def chat_completions(request):
+@@ -487,0 +847,2 @@ async def chat_completions(request):
 +            if usage is not None:
 +                obj["usage"] = usage
-@@ -492 +827 @@ async def chat_completions(request):
+@@ -492 +853 @@ async def chat_completions(request):
 -        in_think = [True]          # generation starts inside <think> (template)
 +        in_think = [req["enable_thinking"]]
-@@ -556 +891 @@ async def chat_completions(request):
+@@ -556 +917 @@ async def chat_completions(request):
 -                calls, finish, reasoning, content = payload
 +                calls, finish, reasoning, content, ptoks, otoks = payload
-@@ -568 +903,3 @@ async def chat_completions(request):
+@@ -568 +929,3 @@ async def chat_completions(request):
 -                await send({}, finish = finish)
 +                await send({}, finish = finish, usage = {
 +                    "prompt_tokens": ptoks, "completion_tokens": otoks,
 +                    "total_tokens": ptoks + otoks})
-@@ -580 +917,2 @@ def main():
+@@ -580 +943,2 @@ def main():
 -    global MODEL_DIR, DRAFT_DIR, PORT
 +    global MODEL_DIR, DRAFT_DIR, PORT, MODEL_ID, MODEL_IDS
 +    global _ALLOW_IMAGE_URLS, _IMAGE_MAX_BYTES, _IMAGE_MAX_PIXELS
-@@ -582,0 +921,4 @@ def main():
+@@ -582,0 +947,4 @@ def main():
 +    ap.add_argument("--served_model_name", default = None, nargs = "+",
 +                    help = "Model ID(s) advertised by /v1/models; the first is "
 +                           "canonical, the rest are aliases so existing clients "
 +                           "keep working across lane switches")
-@@ -602,0 +945,10 @@ def main():
+@@ -602,0 +971,10 @@ def main():
 +    ap.add_argument("--vision", action = "store_true",
 +                    help = "load the checkpoint's vision tower and accept "
 +                           "image_url content parts")
@@ -490,23 +521,23 @@ index 23d22e4..6659e6a 100644
 +                    help = "max encoded bytes per image (data URI or fetched)")
 +    ap.add_argument("--max_image_mp", type = float, default = 64,
 +                    help = "max megapixels per image before decoding")
-@@ -603,0 +956,6 @@ def main():
+@@ -603,0 +982,6 @@ def main():
 +    _ALLOW_IMAGE_URLS = bool(args.allow_image_urls)
 +    _IMAGE_MAX_BYTES = int(args.max_image_mb * 1024 * 1024)
 +    _IMAGE_MAX_PIXELS = int(args.max_image_mp * 1e6)
 +    if args.served_model_name:
 +        MODEL_IDS = list(args.served_model_name)
 +        MODEL_ID = MODEL_IDS[0]
-@@ -620,0 +979 @@ def main():
+@@ -620,0 +1005 @@ def main():
 +          + (" + vision" if args.vision else "")
-@@ -622 +981,3 @@ def main():
+@@ -622 +1007,3 @@ def main():
 -    generator, tokenizer = build_model(argv, use_draft = use_draft)
 +    generator, tokenizer, vision_model = build_model(
 +        argv, use_draft = use_draft,
 +        vision_model_dir = args.model if args.vision else None)
-@@ -628,0 +990 @@ def main():
+@@ -628,0 +1016 @@ def main():
 +    app["vision_model"] = vision_model
-@@ -630,0 +993 @@ def main():
+@@ -630,0 +1019 @@ def main():
 +    app.router.add_get("/version", version)
-@@ -631,0 +995 @@ def main():
+@@ -631,0 +1021 @@ def main():
 +    app.router.add_post("/v1/chat/completions/render", render_chat)

@@ -129,9 +129,22 @@ Writeups that decide MSI production-lane changes (`lane-assessments/`):
   67, and DFlash2 reproducibly omits a required tool argument. Vision addendum:
   the checkpoint's BF16 vision tower works on this engine, including vision +
   MTP (the combination that crashes vLLM here), multi-image, images after 78K of
-  text, and images inside tool turns. **`55-mtp-262k-vision` is MSI production
-  since 2026-09-03** (`qwen38-exl3.service`): vision + ~2x decode + prompt
-  caching, at −4 Hard Mode and slower prefill.
+  text, and images inside tool turns. **`55-mtp-262k-vision` was MSI production
+  2026-09-03 .. 2026-09-24** (`qwen38-exl3.service`): vision + ~2x decode + prompt
+  caching, at −4 Hard Mode and slower prefill. Now the rollback checkpoint
+  behind the ThinkingCap lane below.
+- **[ThinkingCap-Qwen3.8-27B assessment and promotion (MSI)](./lane-assessments/report-msi-thinkingcap-qwen3.8-27b.md)**
+  bottlecapai's brief-thinking finetune of the same base, own EXL3 5.5-bpw
+  conversion on the same engine/kit/flags. tool-eval low 88/63 vs base EXL3
+  90/63, but at xhigh on realistic coding prompts the base finishes 0/4 under a
+  20K cap vs ThinkingCap 2-3/4 with ~27% fewer tokens, ~85 tok/s decode at
+  xhigh; vision check passes. **`tc38-55-mtp-262k-vision` is MSI production
+  since 2026-09-24** (`qwen38-exl3.service`). Post-promotion battery on live
+  prod: needles 4/4 to 196K, code edits 2/2, tools 12/12, 197 tok/s, vision
+  context 6/6, tool-eval xhigh 92/57; VulcanBench v1 51/52, carbyne 19/22,
+  v3 16/23 (base: 50/52, 18/22, 13/23). Temperature 1.0 (the card's recipe)
+  is harmful for tool calling; the lane keeps 0.6. Gotcha: the EXL3 kit
+  defaults `max_tokens` to 1024 when a client sends none.
 - **[Nemotron 3.5 Lightning 30B-A3B bench + ThinkingCap card-recipe promotion (MSI)](./lane-assessments/report-msi-nemotron-3.5-lightning-30b.md)**
   Fastest single-stream model on the box (~328 t/s llama.cpp, ~1977 t/s aggregate @16 on vLLM NVFP4) but full-suite 80 vs prod ThinkingCap 88 — no lane change; the ThinkingCap card-recipe rerun (hard-mode 60 → 67 on teb v2.5.1) is promoted to production.
 - **[Muse-Glimmer-30B Pilot Outcome (MSI)](./lane-assessments/report-msi-muse-glimmer-pilot-outcome.md)**

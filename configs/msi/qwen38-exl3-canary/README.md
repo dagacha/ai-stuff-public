@@ -1,10 +1,14 @@
 # Qwen3.8 EXL3 canary
 
-**Status:** `55-mtp-262k-vision` PROMOTED to production 2026-09-03
-(`qwen38-exl3.service`, `../serve-qwen38-exl3.sh`, `switch-lane.sh qwen38-exl3`;
-`promote.sh` here does the install + flip + bridge verification). The other
-arms remain canaries on port 8102 — never run one while the production unit
-holds the GPU (`systemctl --user stop qwen38-exl3.service` first).
+**Status:** `tc38-55-mtp-262k-vision` (ThinkingCap-Qwen3.8-27B, own EXL3 5.5bpw
+conversion) PROMOTED to production 2026-09-24, replacing `55-mtp-262k-vision`
+(base Qwen3.8-27B, production 2026-09-03 .. 2026-09-24). Same unit, kit, engine
+and flags; only the checkpoint differs (`../serve-qwen38-exl3.sh`,
+`../thinkingcap38-exl3/promote.sh` for flip/rollback of the runtime copy,
+`benchmarks/lane-assessments/report-msi-thinkingcap-qwen3.8-27b.md`). The base
+arm stays installed as the rollback. All other arms remain canaries on port
+8102 — never run one while the production unit holds the GPU
+(`systemctl --user stop qwen38-exl3.service` first).
 
 This is an isolated port-8102 comparison of Qwen3.8-27B EXL3 targets with their
 built-in MTP head or the 5.0-bpw DFlash2 companion drafter. It does not alter
