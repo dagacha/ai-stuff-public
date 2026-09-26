@@ -1,6 +1,6 @@
 # GLM-5.3-Flash (EXL3 4bpw) inference server on 2x DGX Spark
 
-**Status:** active — **TP=3 across all three Sparks since 2026-09-15**, restarted 2026-09-18 on upstream `ca85576` (receipts in [TP=3 on the 3-node ring](#tp3-on-the-3-node-ring-2026-09-15-restart-2026-09-18)); the 2× TP=2 profile below (verified 2026-09-07 on `6599585`, benchmarked 2026-09-09) is **stopped** and remains the fallback
+**Status:** active — **TP=3 across all three Sparks since 2026-09-15**, restarted 2026-09-21 on upstream `775a58b` with `GLM53_KDA_BF16_LARGE_M=1` (receipts in [TP=3 on the 3-node ring](#tp3-on-the-3-node-ring-2026-09-15-restarts-2026-09-18-and-2026-09-21)); the 2× TP=2 profile below (verified 2026-09-07 on `6599585`, benchmarked 2026-09-09) is **stopped** and remains the fallback
 
 Second serving stack for the 2-node DGX Spark cluster, alongside the
 [DeepSeek V4 Flash DSpark stack](deepseek-v4-flash-server.md). Deployed and
@@ -46,9 +46,9 @@ full vLLM speed on this hardware.
   on the head. Config is `.env.tp3` (sourced after `.env`). Stop with
   `./stop.sh tp3` — `start.sh` and `switch-stack.sh` do **not** know the
   TP=3 containers. Details in
-  [TP=3 on the 3-node ring](#tp3-on-the-3-node-ring-2026-09-15-restart-2026-09-18).
+  [TP=3 on the 3-node ring](#tp3-on-the-3-node-ring-2026-09-15-restarts-2026-09-18-and-2026-09-21).
 - **Repo:** `~/GLM-5.3-Flash-EXL3-2x-DGX-Sparks`
-  (github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks), upstream **`ca85576`** (2026-09-18, release 1.6.0 + thin-decode/numerical-panel commits; TP=3 runs it — see the TP=3 section); the TP=2 profile was last verified on **`6599585`** (2026-09-07, E3 grouped fat-expert kernel `EXL3_FAT_GROUPED=1`, util 0.86 — the configuration benchmarked in [the 6599585 report](../../benchmarks/tool-eval/report-2x-dgx-spark-glm-5.3-flash-exl3-6599585.md)); previously **`c190db1`**
+  (github.com/MiaAI-Lab/GLM-5.3-Flash-EXL3-2x-DGX-Sparks), upstream **`775a58b`** (2026-09-21, 20 commits past `ca85576` = release 1.6.0 + thin-decode/numerical-panel commits; TP=3 runs it with the KDA large-M flag on — see the TP=3 section); the TP=2 profile was last verified on **`6599585`** (2026-09-07, E3 grouped fat-expert kernel `EXL3_FAT_GROUPED=1`, util 0.86 — the configuration benchmarked in [the 6599585 report](../../benchmarks/tool-eval/report-2x-dgx-spark-glm-5.3-flash-exl3-6599585.md)); previously **`c190db1`**
   (2026-09-01; previously `b5ab809` 2026-08-30, first deployed at `c91754f`
   2026-08-28 — see
   [Upstream update 2026-09-01](#upstream-update-2026-09-01-b5ab809--c190db1))
@@ -61,28 +61,29 @@ full vLLM speed on this hardware.
 
 The running configuration: `./start-tp3.sh`, `.env` + `.env.tp3` (details,
 rank layout and receipts in
-[TP=3 on the 3-node ring](#tp3-on-the-3-node-ring-2026-09-15-restart-2026-09-18)).
+[TP=3 on the 3-node ring](#tp3-on-the-3-node-ring-2026-09-15-restarts-2026-09-18-and-2026-09-21)).
 
 | Setting | Value | Note |
 |---|---|---|
 | Ranks | **TP=3 + expert parallel** over `--nnodes 3`, `mp` executor: rank 0 head `10.10.0.1` (API), rank 1 gx10 `10.10.2.2`, rank 2 gn100 `10.10.0.2` | 96 of 288 routed experts per rank; attention heads padded 64 → 66 (`TP3_HEAD_OVERRIDE=66`) |
 | Context window | **1,000,000** tokens (`MAX_MODEL_LEN`, upstream example default) | the TP=2 700k trade-down does not apply: three GB10s hold the 1M KV |
-| KV pool | **2,656,934 tokens** (2.66× a full 1M request; 2026-09-18 restart, `Available KV cache memory: 33.22 GiB`) | first boot 2026-09-15 had 2,668,613; the −12k is CUDA-graph profiling on this vLLM |
+| KV pool | **2,519,708 tokens** (2.52× a full 1M request; 2026-09-21 boot with the KDA large-M copy, `Available KV cache memory: 31.21 GiB`) | stock 775a58b boot the same day: 2,667,153 (34.51 GiB); the KDA BF16 copy costs 2.30 GiB/rank of model memory (−5.5 % KV pool) |
 | GPU memory utilization | **0.80** (`GPU_MEM_UTIL`, upstream example default) | head `MemAvailable` ≈ 12 GB after boot, workers ~17 GB |
-| Image / loader | `…:exl3-instanttensor` **built locally** (stamp `b12244e3ba09`), `LOAD_FORMAT=instanttensor` | shipped to both workers by the launcher |
-| Weights | one 164 GiB copy on the head, exported over **NFSv4.2** (`glm53-nfs`), mounted per rank over its own CX7 link | load **~45 s per rank** (`Model loading took 54.25 GiB` each) |
+| Image / loader | `…:exl3-instanttensor` **built locally** (stamp `e4aa088b26ef`, image ID `ef9f5013c41a`, rebuilt 2026-09-21), `LOAD_FORMAT=instanttensor` | shipped to both workers by the launcher; the stamp hashes the overlay dir, so an overlay-only pull still rebuilds |
+| Weights | one 164 GiB copy on the head, exported over **NFSv4.2** (`glm53-nfs`), mounted per rank over its own CX7 link | load **~51 s per rank** (`Model loading took 56.55 GiB` each on the 2026-09-21 flag-on boot; the stock arm loads 54.25 GiB in ~45–49 s) |
 | Scheduler | **fair v5 mixed-prefill on** (`GLM53_MIXED_PREFILL_CHUNK=fair`: share 0.30, probe chunk 256, ladder 128..2048, interval 2 s, max 1 chunk) | upstream default for TP=3 since #188/#194; unmeasured here |
 | Max concurrent sequences | 4 | inherited from `.env` |
 | Prefill chunk | 7168 tokens (`MAX_NUM_BATCHED_TOKENS`) | inherited from `.env`; never 8192 (GB10 indexer smem) |
 | Fat-expert prefill | E3 grouped kernel (`EXL3_FAT_GROUPED=1`), `GLM53_INDEXER_WORKSPACE=rightsize` | inherited from `.env` |
 | Dense FP8 | `GLM53_DENSE_FP8=dense,kda` | at TP=3 the KDA `f_b_proj`/`g_b_proj` stay BF16 (boot log line expected) |
+| KDA large-M prefill | **`GLM53_KDA_BF16_LARGE_M=1`** (opt-in, upstream default 0; #233/#237) | KDA `in_proj` rows with M > 512 run a retained BF16 copy on cuBLAS instead of FP8-Marlin: **−7 % cold TTFT at 8k…256k** on this kit, +2.30 GiB/rank, decode path untouched — see [Measured performance](#measured-performance) |
 | Speculative decoding | DFlash2 k=7, **draft TP=1** (pinned to rank 0; 32/8 heads do not divide by 3, GQA padded 36/9), adaptive-k **off** | drafter revision `dc77ff1c` |
 | Prefix caching | on; #207 per-group retention, drafter (SWA) retention interval 0 | a finished long chat is no longer evicted by DFlash skipped-window blocks |
 | Vision | **on, images only** (`LIMIT_MM='{"image":100,"video":0}'`, `MM_ENCODER_TP_MODE=data`) | video must stay 0 |
 | Tools / reasoning | `--tool-call-parser glm47 --enable-auto-tool-choice --reasoning-parser glm45`; `tool_choice:"none"` masks the `<tool_call>` opener (#215) | |
 | Control plane | Gloo/NCCL bootstrap over per-rank CX7 `*_SOCKET_IFNAME` / `*_HOST_IP`; `/32` routes in netplan | management LAN is down on all three nodes ([ring-cluster.md](ring-cluster.md#tp3-control-plane-routes)) |
 | Boot | ~230 s from `docker run` to healthy (after the image is built and shipped) | smoke: 36-token no-think completion in 1.34 s |
-| Performance | **unbenchmarked** on this kit | see [Caveats](#caveats--open-items) |
+| Performance | cold prefill **~1.75–1.80k tok/s** (8k→256k, flag on; ~1.65k stock); decode / tool-eval / VulcanBench **not yet run at TP=3** | see [Measured performance](#measured-performance) and [Caveats](#caveats--open-items) |
 
 ## Serving profile — TP=2 (stopped 2026-09-15, fallback)
 
@@ -330,7 +331,7 @@ The benchmark in
 [`benchmarks/tool-eval/report-2x-dgx-spark-glm-5.3-flash-exl3-6599585.md`](../../benchmarks/tool-eval/report-2x-dgx-spark-glm-5.3-flash-exl3-6599585.md)
 (2026-09-08/09) ran on exactly this boot.
 
-## TP=3 on the 3-node ring (2026-09-15, restart 2026-09-18)
+## TP=3 on the 3-node ring (2026-09-15, restarts 2026-09-18 and 2026-09-21)
 
 Since 2026-09-15 GLM serves from **all three Sparks** of the
 [ring cluster](ring-cluster.md) with upstream's `./start-tp3.sh` — tensor
@@ -380,11 +381,11 @@ in netplan since 2026-09-18** — see
 [ring-cluster.md → TP=3 control-plane routes](ring-cluster.md#tp3-control-plane-routes).
 The head needs none (it has a direct link to both).
 
-### `.env.tp3` vs `.env.tp3.example` (upstream `ca85576`)
+### `.env.tp3` vs `.env.tp3.example` (upstream `775a58b`)
 
 Since 2026-09-18 the file follows the upstream example except for the kit
-addressing. Full sanitised copy:
-[`receipts/glm53-tp3-ca85576-2026-09-18/env.tp3.txt`](receipts/glm53-tp3-ca85576-2026-09-18/env.tp3.txt).
+addressing and, since 2026-09-21, one opt-in. Full copy:
+[`receipts/glm53-tp3-775a58b-2026-09-21/env.tp3.txt`](receipts/glm53-tp3-775a58b-2026-09-21/env.tp3.txt).
 
 | Key | Upstream example | Here | Why |
 |---|---|---|---|
@@ -394,6 +395,7 @@ addressing. Full sanitised copy:
 | `NCCL_IB_SUBNET_AWARE_ROUTING` | unset | `1` | with `NCCL_CROSS_NIC=1` (example default) |
 | `NFS_SHARE` / `NFS_SERVER_IP_1` / `_2` | commented / autodetect | `1` / `10.10.2.1` / `10.10.0.1` | explicit per-rank head address on that rank's cable |
 | `NFS_CLIENTS` | `10.0.0.x` list | `10.10.0.0/24,10.10.2.0/24,10.10.4.0/24` | ring subnets |
+| `GLM53_KDA_BF16_LARGE_M` | commented (`0`) | **`1`** | the only deliberate opt-in: −7 % cold TTFT measured here, see the 2026-09-21 restart below |
 | everything else | — | **= example** | `IMAGE=…:exl3-instanttensor`, `LOAD_FORMAT=instanttensor`, `GLM53_MIXED_PREFILL_CHUNK=fair` (share 0.30, step/interval 2000 ms, chunk 256, max 1 chunk), `GLM53_APC_RETENTION_INTERVAL_SWA=0`, `GLM53_DENSE_FP8=dense,kda`, `ABLIT=0`, `GPU_MEM_UTIL=0.80`, `MAX_MODEL_LEN=1000000`, `DFLASH_DRAFT_TP=1`, TP=3 shape knobs |
 
 Inherited from `.env` (TP=2 file, unchanged): `MAX_NUM_SEQS=4`,
@@ -437,6 +439,65 @@ mounts), `smoke-and-verify.txt` (request, containers, image, memory,
 netplan routes), `env.tp3.txt`. Backup of the previous config:
 `.env.tp3.pre-ca85576.bak` in the repo dir.
 
+### Restart 2026-09-21 (`ca85576` → `775a58b`) and the KDA large-M A/B
+
+`./start-tp3.sh restart` twice: once stock on the new tip, once with
+`GLM53_KDA_BF16_LARGE_M=1` in `.env.tp3` after the A/B below. Backup of
+the pre-pull config: `.env.tp3.pre-775a58b.bak` in the repo dir.
+
+**What the pull brings** (`ca85576..775a58b`, 20 commits, no Dockerfile
+change): the opt-in KDA large-M BF16 prefill path (#233, extended to TP=3
+in #237), a TP=4-only sparse-MLA slice (#223), the TP=2-only thin-decode
+kernels, and two launcher fixes — it now warns when a shell variable
+overrides a `.env` value (#168) and defaults `USER` in non-login shells
+(#197). Upstream defaults are unchanged, so the stock boot is
+behaviourally the 2026-09-18 one.
+
+| Change | Detail |
+|---|---|
+| Image | the launcher **rebuilt** `:exl3-instanttensor` (stamp `e4aa088b26ef`, image ID `ef9f5013c41a`, 19.5 GiB) and re-shipped it to both ranks even though the Dockerfile is untouched — the recipe stamp hashes the overlay directory. Cached layers, a few minutes |
+| Stock boot | `Model loading took 54.25 GiB` per rank (as before), KV **2,667,153 tokens** (34.51 GiB, 2.67×); warmup 24/24 in 62 s; health 200 |
+| Flag boot | `Model loading took 56.55 GiB` (**+2.30 GiB/rank** = 34 KDA layers × 68.2 MiB, matching upstream's theoretical 2.26 GiB for the TP3-local `[8726x4096]` shape), KV **2,519,708 tokens** (31.21 GiB, **2.52×**); no rebuild (stamp matched); host `MemAvailable` after boot head 13 / gx10 15 / gn100 14 GB |
+| Not adopted | thin-decode `GLM53_EXL3_MOE_FAST` (TP=2 only, launcher unsets it), `VLLM_SM120_SPARSE_MLA_SLICE_TOKENS` (TP=4 only) |
+
+**Cold-prefill A/B.** Upstream's own receipt protocol
+(`tests/_run_cold_prefill.py`: temp 0, thinking off, `max_tokens` 8,
+stream + usage, fresh salt per request, one at a time, TTFT = first
+content token), run three times per rung on each arm from a fresh boot;
+the only difference between the arms is the flag. Medians, with the
+min..max spread in the receipt:
+
+| Prompt | Stock TTFT | Flag TTFT | Δ | Prefill tok/s stock → flag |
+|---|---:|---:|---:|---:|
+| ~8k | 4.91 s | 4.57 s | **−6.9 %** | 1628 → 1749 |
+| ~16k | 9.59 s | 8.89 s | **−7.3 %** | 1668 → 1799 |
+| ~100k | 60.10 s | 55.65 s | **−7.4 %** | 1664 → 1797 |
+| ~256k | 157.9 s | 146.1 s | **−7.5 %** | 1621 → 1752 |
+| ~8k prefix-cache follow-up | 0.53 s | 0.51 s | −2.5 % | (cache hit, not prefill) |
+
+Spread within an arm is under 1.5 % at every rung, every reply was the
+expected `OK`, and the gain is flat across sizes (the path only changes
+the KDA `in_proj` GEMM for rows with M > 512, so it scales with prefill
+work). Upstream measured −11…14 % on TP=2; the smaller share here is
+consistent with the TP3-local projection being a third narrower per
+rank. Decode is not measured because the flag does not touch the
+decode path (M ≤ 512 stays on the stock Marlin kernel).
+
+**Decision: keep the flag on.** Cost is 2.30 GiB/rank and a 5.5 %
+smaller KV pool (still 2.52× a full 1M request). Caveat carried from
+upstream: their numerical study of this path is "formally inconclusive"
+because its own stock control failed the comparator; no tool-eval or
+VulcanBench run has been done with the flag yet (none has at TP=3 at
+all, see [Caveats](#caveats--open-items)).
+
+Receipts: [`receipts/glm53-tp3-775a58b-2026-09-21/`](receipts/glm53-tp3-775a58b-2026-09-21/) — `ab-summary.txt` (the table above with
+spreads), `cold_prefill_stock.json` / `cold_prefill_kda1.json` (every
+request with usage and metrics deltas), `cold_prefill_ab.py` (the runner:
+upstream's script with the ladder trimmed to 8k/16k/100k/256k, three
+repeats per rung; usage `cold_prefill_ab.py <arm> [reps] [out.json]`, output
+defaults to `cold_prefill_<arm>.json` beside the script), `boot.keylines.txt`
+(both restarts), `env.tp3.txt`.
+
 **Not adopted from 1.5.0 / 1.6.0** (assessed 2026-09-17/18):
 
 - *Cooperative decode MoE, TP2 (`extensions/cooperative_moe/`, 1.5.0).*
@@ -457,6 +518,19 @@ netplan routes), `env.tp3.txt`. Backup of the previous config:
   inconclusive".
 
 ## Measured performance
+
+**TP=3 (2026-09-21, upstream `775a58b`)** — cold prefill only so far, from
+the [KDA large-M A/B](#restart-2026-09-21-ca85576--775a58b-and-the-kda-large-m-ab):
+
+| Prompt | Cold TTFT (flag on, live) | Prefill tok/s | Stock 775a58b |
+|---|---:|---:|---:|
+| ~8k | 4.57 s | 1749 | 4.91 s |
+| ~16k | 8.89 s | 1799 | 9.59 s |
+| ~100k | 55.65 s | 1797 | 60.10 s |
+| ~256k | 146.1 s | 1752 | 157.9 s |
+
+Decode, tool-eval and VulcanBench at TP=3 are still open. The numbers
+below are the **TP=2** stack (stopped 2026-09-15).
 
 
 Head node, single stream, temp 0, thinking off, upstream's
@@ -590,9 +664,10 @@ ZCode's `config.json` by the table in [zcode-setup.md](../agents/zcode-setup.md)
 
 ## Caveats / open items
 
-- **TP=3 is unbenchmarked** (no tool-eval / VulcanBench row yet; the fair
-  mixed-prefill scheduler has been on since 2026-09-18 and is also
-  unmeasured here). Upstream's own 3× kit reads structured 87.8 / code 54.9
+- **TP=3 has no tool-eval / VulcanBench / decode row yet** (only the
+  2026-09-21 cold-prefill A/B; the fair mixed-prefill scheduler has been on
+  since 2026-09-18 and is unmeasured here, and the KDA large-M flag is on
+  since 2026-09-21 without a quality gate). Upstream's own 3× kit reads structured 87.8 / code 54.9
   / prose 39.6 tok/s vs 73.4 / 45.0 / 32.9 at TP=2 — same prompts, not
   this kit.
 - **`switch-stack.sh` and `start.sh` do not manage the TP=3 containers.**

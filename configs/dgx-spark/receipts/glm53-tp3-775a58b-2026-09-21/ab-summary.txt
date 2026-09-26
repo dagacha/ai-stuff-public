@@ -1,0 +1,9 @@
+# Cold-prefill A/B, GLM-5.3-Flash EXL3 TP=3 on 3x DGX Spark, upstream 775a58b, 2026-09-21
+# Protocol = upstream tests/_run_cold_prefill.py (cold_prefill_ab.py: same requests, 3 reps/rung, fresh salt each, one at a time,
+# temp 0, thinking off, max_tokens 8, stream+usage, TTFT = first content token). Arms are fresh boots, flag-only difference.
+# rung | prompt_tokens | stock median TTFT (min..max) | kda median TTFT (min..max) | delta | prefill tok/s stock -> kda | all outputs OK
+~8k             |    7995 |    4.91 (4.86..4.93) |    4.57 (4.51..4.58) |  -6.9% |  1628 ->  1749 | True
+~8k follow-up   |    8004 |    0.53 (0.53..0.53) |    0.51 (0.51..0.51) |  -2.5% | 15209 -> 15597 | True
+~16k            |   15995 |    9.59 (9.58..9.64) |    8.89 (8.89..8.91) |  -7.3% |  1668 ->  1799 | True
+~100k           |   99995 |   60.10 (60.00..60.13) |   55.65 (55.56..55.70) |  -7.4% |  1664 ->  1797 | True
+~256k           |  255995 |  157.93 (157.56..158.11) |  146.12 (145.99..146.15) |  -7.5% |  1621 ->  1752 | True
